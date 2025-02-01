@@ -9,13 +9,52 @@
 <body>
     <div class="login-container">
         <h2>Login</h2>
-        <input type="text" id="username" placeholder="Benutzername" required>
-        <input type="password" id="password" placeholder="Passwort" required>
-        <button id="loginBtn">Anmelden</button>
-        <p>Kein Konto? <a href="/sites/register.html">Jetzt registrieren</a></p>
+        <input type="text" id="username" placeholder="Benutzername" required aria-label="Benutzername eingeben">
+        <input type="password" id="password" placeholder="Passwort" required aria-label="Passwort eingeben">
+        <button id="loginBtn" aria-label="Anmelden">Anmelden</button>
+        <p>Kein Konto? <a href="register.html">Jetzt registrieren</a></p>
 
+        <!-- Fehlermeldung -->
+        <p id="errorMessage" style="color: red; display: none;">Ungültige Anmeldedaten. Bitte versuche es erneut.</p>
     </div>
 
-    <script src="../scripts/login.js"></script>
+    <script>
+        // Anmeldung
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Validierung der Eingabefelder
+            if (!username || !password) {
+                document.getElementById('errorMessage').textContent = 'Bitte fülle beide Felder aus.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return;
+            }
+
+            // API-Aufruf zur Anmeldung
+            fetch('/login', {
+                method: 'POST',
+                body: JSON.stringify({ username, password }),
+                headers: { 'Content-Type': 'application/json' },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Benutzer-ID im localStorage speichern
+                        localStorage.setItem('userId', data.userId);
+                        // Weiterleitung zur Hauptseite
+                        window.location.href = 'index.html';
+                    } else {
+                        document.getElementById('errorMessage').textContent = 'Ungültige Anmeldedaten. Bitte versuche es erneut.';
+                        document.getElementById('errorMessage').style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Fehler beim Anmelden:', error);
+                    document.getElementById('errorMessage').textContent = 'Es gab ein Problem bei der Anmeldung. Bitte versuche es später.';
+                    document.getElementById('errorMessage').style.display = 'block';
+                });
+        });
+    </script>
 </body>
 </html>

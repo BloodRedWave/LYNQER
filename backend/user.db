@@ -1,19 +1,16 @@
 {
-  "12345": {
-    "id": "12345",
-    "username": "Senku",
-    "password": "hashed_password",
-    "bio": "Wissenschaft ist cool!",
-    "friends": []
+  "123456": {
+    "user-id": "123456",
+    "username": "USERNAME",
+    "email": "email@example.com",
+    "role": "member",
+    "timestamp": 1672498200
   },
-  "67890": {
-    "id": "67890",
-    "username": "Taiju",
-    "password": "hashed_password",
-    "bio": "Ich bin stark!",
-    "friends": []
-  },
-  "CallMeKira": {
-    "password": "6ae4defba516422e24dc027fe1faf40e0f8526e186b8532482407e06eb24f6d0922f81a4f8f8e8adb2240d22e1712e3b3e95df92986c4aab0dbb664e5c2936f6"
+  "789012": {
+    "user-id": "789012",
+    "username": "admin",
+    "email": "admin@example.com",
+    "role": "admin",
+    "timestamp": 1672498201
   }
 }

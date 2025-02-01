@@ -3,7 +3,7 @@ const socket = io(); // Assuming you're using socket.io for real-time communicat
 // Get username from localStorage
 const username = localStorage.getItem("username");
 if (!username) {
-    window.location.href = "login.html";
+    window.location.href = "login.html"; // Redirect to login if not logged in
 } else {
     document.getElementById("username").innerText = username;
 }
@@ -21,6 +21,8 @@ const configuration = {
 // Handle logout
 document.getElementById("logoutBtn").addEventListener("click", function() {
     localStorage.removeItem("username");
+    localStorage.removeItem("token"); // Also clear the token
+    socket.disconnect(); // Ensure WebSocket connection is closed
     window.location.href = "login.html";
 });
 
@@ -37,12 +39,16 @@ document.getElementById("closeAddContactPopup").addEventListener("click", functi
 // Submit Add Contact form
 document.getElementById("addContactSubmitBtn").addEventListener("click", function() {
     const usernameOrID = document.getElementById("usernameInput").value || document.getElementById("userIdInput").value;
-    
+
     if (!usernameOrID) return;
+
+    // Show loading spinner
+    document.getElementById("loadingMessage").style.display = "block";
 
     fetch(`/getUser?query=${encodeURIComponent(usernameOrID)}`)
         .then(res => res.json())
         .then(data => {
+            document.getElementById("loadingMessage").style.display = "none"; // Hide loading spinner
             if (data.error) {
                 document.getElementById("errorMessage").style.display = "block";
             } else {
@@ -52,7 +58,10 @@ document.getElementById("addContactSubmitBtn").addEventListener("click", functio
                 document.getElementById("addContactPopup").classList.remove("show");
             }
         })
-        .catch(err => alert("Fehler bei der Suche nach dem Benutzer: " + err));
+        .catch(err => {
+            document.getElementById("loadingMessage").style.display = "none"; // Hide loading spinner
+            alert("Fehler bei der Suche nach dem Benutzer: " + err);
+        });
 });
 
 // Add Friend Button Event (Inside Profile Popup)

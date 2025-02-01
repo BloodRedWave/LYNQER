@@ -69,7 +69,7 @@
 
     <script>
         // Wichtige Variablen
-        let userId = null;  // ID des eingeloggten Benutzers (muss durch Login gesetzt werden)
+        let userId = null;  // ID des eingeloggten Benutzers (wird durch Login gesetzt)
         let socket = io(); // Socket.io-Verbindung
 
         // Kontakt hinzufügen Popup öffnen
@@ -192,8 +192,8 @@
 
         // Initialisieren der Seite
         document.addEventListener('DOMContentLoaded', () => {
-            // Hier muss die ID des eingeloggten Benutzers gesetzt werden
-            userId = 'yourLoggedInUserId'; // Dies wird im Backend gesetzt
+            // Benutzer-ID aus dem lokalen Speicher holen oder vom Server setzen
+            userId = localStorage.getItem('userId') || 'yourLoggedInUserId'; // Alternativ dynamisch aus der Session
 
             loadFriends(); // Freunde laden
             loadFriendRequests(); // Freundesanfragen laden

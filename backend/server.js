@@ -1,222 +1,93 @@
-require("dotenv").config(); // Lädt die .env-Datei
-
 const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const bodyParser = require("body-parser");
-const cors = require("cors");
 const path = require("path");
 const jwt = require("jsonwebtoken");
-const { loadUsers, saveUsers, hashPassword, comparePassword, getUserByQuery, addFriend } = require("./db"); // Funktionen importieren
+const { loadUsers, addUser, addFriend, getUserByQuery, comparePassword, hashPassword, checkRole } = require("./db.js");
+const dotenv = require("dotenv");
 
+dotenv.config();
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: process.env.FRONTEND_URL, // Stelle sicher, dass du deine URL hier konfigurierst
-        credentials: true,
-    },
-});
+app.use(express.json());
 
-app.use(bodyParser.json());
-app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+// Stelle statische Dateien aus dem 'public'-Ordner bereit
+app.use(express.static(path.join(__dirname, "public")));
 
-// Statische Dateien bereitstellen
-app.use(express.static(path.join(__dirname, "../frontend")));
+const PORT = process.env.PORT || 8000;
 
-// Routen für verschiedene Seiten
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "../frontend/sites/login.html")));
-app.get("/login", (req, res) => res.sendFile(path.join(__dirname, "../frontend/sites/login.html")));
-app.get("/register", (req, res) => res.sendFile(path.join(__dirname, "../frontend/sites/register.html")));
-app.get("/index", (req, res) => res.sendFile(path.join(__dirname, "../frontend/sites/index.html")));
+// Middleware zur Überprüfung des JWT-Tokens
+const authenticateJWT = (req, res, next) => {
+    const token = req.header("Authorization")?.split(" ")[1];
 
-// Registrierung
-app.post("/register", async (req, res) => {
-    try {
-        let users = loadUsers();
-        const { username, password } = req.body;
+    if (!token) return res.status(403).json({ error: "Zugang verweigert. Kein Token" });
 
-        if (!username || !password) {
-            return res.status(400).json({ message: "Benutzername und Passwort erforderlich!" });
-        }
-        if (users[username]) {
-            return res.status(400).json({ message: "Benutzername existiert bereits!" });
-        }
-
-        const hashedPassword = await hashPassword(password);
-        users[username] = { password: hashedPassword };
-        saveUsers(users);
-
-        res.status(201).json({ message: "Registrierung erfolgreich!" });
-    } catch (error) {
-        console.error("❌ Registrierungsfehler:", error);
-        res.status(500).json({ message: "Serverfehler bei der Registrierung" });
-    }
-});
-
-// Login
-app.post("/login", async (req, res) => {
-    try {
-        let users = loadUsers();
-        const { username, password } = req.body;
-
-        if (!username || !password) {
-            return res.status(400).json({ message: "Benutzername und Passwort erforderlich!" });
-        }
-        if (!users[username]) {
-            return res.status(400).json({ message: "Benutzer nicht gefunden!" });
-        }
-
-        const isValidPassword = await comparePassword(password, users[username].password);
-        if (!isValidPassword) {
-            return res.status(401).json({ message: "Falsches Passwort!" });
-        }
-
-        // JWT-Token generieren
-        const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: "1h" });
-        res.json({ message: "Login erfolgreich!", token });
-    } catch (error) {
-        console.error("❌ Loginfehler:", error);
-        res.status(500).json({ message: "Serverfehler beim Login" });
-    }
-});
-
-// Middleware zur Überprüfung des Tokens
-const verifyToken = (req, res, next) => {
-    const token = req.headers["authorization"];
-    if (!token) return res.status(403).json({ message: "Token erforderlich!" });
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-        if (err) return res.status(401).json({ message: "Ungültiges Token!" });
-        req.user = decoded;
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: "Ungültiges Token" });
+        req.user = user;
         next();
     });
 };
 
-// WebSocket-Handling
-let usersOnline = {}; // Speichert eingeloggte Benutzer für den Chat
+// Route zum Hinzufügen eines Benutzers
+app.post("/register", async (req, res) => {
+    const { username, email, password } = req.body;
 
-io.on("connection", (socket) => {
-    console.log("🔗 Neuer Benutzer verbunden:", socket.id);
+    if (!username || !email || !password) return res.status(400).json({ error: "Fehlende Felder" });
 
-    socket.on("setUsername", (username) => {
-        if (!username) return;
-        usersOnline[username] = socket.id;
-        socket.username = username;
-        io.emit("updateUserList", Object.keys(usersOnline));
-        console.log(`✅ ${username} ist online`);
-    });
+    const userID = Date.now().toString(); // Benutzer-ID basierend auf der Zeit erstellen
+    const timestamp = Math.floor(Date.now() / 1000); // Unix-Timestamp für den Erstellungszeitpunkt
 
-    socket.on("sendMessage", (data) => {
-        if (usersOnline[data.to]) {
-            io.to(usersOnline[data.to]).emit("receiveMessage", { from: socket.username, message: data.message });
-        } else {
-            console.warn(`⚠ Nachricht konnte nicht zugestellt werden: ${data.to} ist offline`);
-        }
-    });
+    const hashedPassword = await hashPassword(password);
 
-    // WebRTC Signalisierung
-    socket.on("offer", (data) => {
-        const targetSocket = usersOnline[data.to];
-        if (targetSocket) {
-            io.to(targetSocket).emit("offer", { from: socket.username, offer: data.offer });
-        }
-    });
+    const newUser = {
+        "user-id": userID,
+        username,
+        email,
+        role: "member", // Standardrolle: member
+        timestamp,
+        password: hashedPassword
+    };
 
-    socket.on("answer", (data) => {
-        const targetSocket = usersOnline[data.to];
-        if (targetSocket) {
-            io.to(targetSocket).emit("answer", { from: socket.username, answer: data.answer });
-        }
-    });
+    const result = addUser(newUser);
+    if (result.error) return res.status(400).json(result);
 
-    socket.on("candidate", (data) => {
-        const targetSocket = usersOnline[data.to];
-        if (targetSocket) {
-            io.to(targetSocket).emit("candidate", { from: socket.username, candidate: data.candidate });
-        }
-    });
-
-    socket.on("disconnect", () => {
-        if (socket.username) {
-            delete usersOnline[socket.username];
-            io.emit("updateUserList", Object.keys(usersOnline));
-            console.log(`❌ ${socket.username} ist offline`);
-        }
-    });
+    res.status(201).json({ message: "Benutzer registriert", userID });
 });
 
-// Abrufen eines Benutzers anhand einer Abfrage (Benutzername oder ID)
-app.get("/getUser", verifyToken, (req, res) => {
-    const user = getUserByQuery(req.query.query);
+// Route zum Login
+app.post("/login", (req, res) => {
+    const { username, password } = req.body;
+
+    const user = getUserByQuery(username);
     if (!user) return res.status(404).json({ error: "Benutzer nicht gefunden" });
-    res.json(user);
+
+    comparePassword(password, user.password).then(isValid => {
+        if (!isValid) return res.status(401).json({ error: "Falsches Passwort" });
+
+        const token = jwt.sign(
+            { sub: user["user-id"], username: user.username, email: user.email, role: user.role },
+            process.env.JWT_SECRET,
+            { expiresIn: "1y" } // 1 Jahr
+        );
+
+        res.json({ token });
+    });
 });
 
-// Hinzufügen eines Freundes
-app.post("/addFriend", verifyToken, (req, res) => {
-    const { userID, friendID } = req.body;
-
-    if (!userID || !friendID) {
-        return res.status(400).json({ message: "Benutzer-ID und Freund-ID sind erforderlich!" });
-    }
-
-    const users = loadUsers();
-    const user = users[userID];
-    const friend = users[friendID];
-
-    if (!user || !friend) {
-        return res.status(404).json({ message: "Benutzer oder Freund nicht gefunden!" });
-    }
+// Route zum Hinzufügen eines Freundes
+app.post("/add-friend", authenticateJWT, (req, res) => {
+    const { friendID } = req.body;
+    const userID = req.user.sub;
 
     const result = addFriend(userID, friendID);
     res.json(result);
 });
 
-// Route, um ICE-Server von Xirsys zu holen
-app.get("/getIceServers", (req, res) => {
-    const https = require("https");
-
-    const options = {
-        host: "global.xirsys.net",
-        path: "/_turn/LYNQER",
-        method: "PUT",
-        headers: {
-            "Authorization": "Basic " + Buffer.from("CallMeKira:fe1f29b4-e0dc-11ef-92ef-0242ac130006").toString("base64"),
-            "Content-Type": "application/json",
-        },
-    };
-
-    const bodyString = JSON.stringify({ format: "urls" });
-
-    const httpreq = https.request(options, (httpres) => {
-        let str = "";
-        httpres.on("data", (data) => { str += data; });
-        httpres.on("end", () => {
-            try {
-                const iceServers = JSON.parse(str);
-                res.json(iceServers.v); // Die ICE-Server zurückgeben
-            } catch (error) {
-                console.error("❌ Fehler beim Parsen der ICE-Server-Daten:", error);
-                res.status(500).json({ message: "Fehler beim Abrufen der ICE-Server" });
-            }
-        });
-    });
-
-    httpreq.on("error", (e) => {
-        console.error("❌ Fehler bei der Anfrage:", e);
-        res.status(500).send("Fehler bei der Verbindung zu Xirsys");
-    });
-
-    httpreq.write(bodyString);
-    httpreq.end();
+// Route zum Überprüfen der Benutzerrolle
+app.get("/check-role", authenticateJWT, (req, res) => {
+    const result = checkRole(req.user.sub);
+    res.json(result);
 });
 
-// Fehlerbehandlung für ungültige Routen
-app.use((req, res) => res.status(404).send("404 - Seite nicht gefunden"));
-
 // Server starten
-const PORT = process.env.PORT || 8000;
-server.listen(PORT, () => {
-    console.log(`✅ Server läuft auf http://localhost:${PORT}`);
+app.listen(PORT, () => {
+    console.log(`Server läuft auf Port ${PORT}`);
 });

@@ -9,14 +9,66 @@
 <body>
     <div class="register-container">
         <h2>Registrieren</h2>
-        <input type="text" id="fullName" placeholder="Name" required>
-        <input type="text" id="newUsername" placeholder="Benutzername" required>
-        <input type="password" id="newPassword" placeholder="Passwort" required>
-        <input type="password" id="confirmPassword" placeholder="Passwort wiederholen" required>
-        <button id="registerBtn">Registrieren</button>
-        <p>Bereits ein Konto? <a href="/sites/login.html">Jetzt anmelden</a></p>
+        <input type="text" id="fullName" placeholder="Name" required aria-label="Vollen Namen eingeben">
+        <input type="text" id="newUsername" placeholder="Benutzername" required aria-label="Benutzername eingeben">
+        <input type="password" id="newPassword" placeholder="Passwort" required aria-label="Passwort eingeben">
+        <input type="password" id="confirmPassword" placeholder="Passwort wiederholen" required aria-label="Passwort wiederholen">
+        <button id="registerBtn" aria-label="Registrieren">Registrieren</button>
+        <p>Bereits ein Konto? <a href="login.html">Jetzt anmelden</a></p>
+
+        <!-- Fehlermeldung -->
+        <p id="errorMessage" style="color: red; display: none;">Bitte füllen Sie alle Felder korrekt aus.</p>
     </div>
 
-    <script src="../scripts/register.js"></script>
+    <script>
+        document.getElementById('registerBtn').addEventListener('click', () => {
+            const fullName = document.getElementById('fullName').value;
+            const username = document.getElementById('newUsername').value;
+            const password = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Validierung der Felder
+            if (!fullName || !username || !password || !confirmPassword) {
+                document.getElementById('errorMessage').textContent = 'Alle Felder sind erforderlich.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                document.getElementById('errorMessage').textContent = 'Die Passwörter stimmen nicht überein.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return;
+            }
+
+            if (password.length < 6) {
+                document.getElementById('errorMessage').textContent = 'Das Passwort muss mindestens 6 Zeichen lang sein.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return;
+            }
+
+            // API-Aufruf zur Registrierung des Benutzers
+            fetch('/register', {
+                method: 'POST',
+                body: JSON.stringify({ fullName, username, password }),
+                headers: { 'Content-Type': 'application/json' },
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Erfolgreiche Registrierung
+                        alert('Registrierung erfolgreich! Du kannst dich jetzt einloggen.');
+                        window.location.href = 'login.html';
+                    } else {
+                        document.getElementById('errorMessage').textContent = data.message || 'Ein Fehler ist aufgetreten. Bitte versuche es später erneut.';
+                        document.getElementById('errorMessage').style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Fehler bei der Registrierung:', error);
+                    document.getElementById('errorMessage').textContent = 'Ein Fehler ist aufgetreten. Bitte versuche es später erneut.';
+                    document.getElementById('errorMessage').style.display = 'block';
+                });
+        });
+    </script>
 </body>
 </html>
