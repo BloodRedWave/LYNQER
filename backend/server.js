@@ -6,7 +6,8 @@ const { Server } = require("socket.io");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require("path");
-const { loadUsers, saveUsers, hashPassword, comparePassword, encryptPassword, getUserByQuery, addFriend } = require("./db"); // Funktionen importieren
+const jwt = require("jsonwebtoken");
+const { loadUsers, saveUsers, hashPassword, comparePassword, getUserByQuery, addFriend } = require("./db"); // Funktionen importieren
 
 const app = express();
 const server = http.createServer(app);
@@ -71,12 +72,26 @@ app.post("/login", async (req, res) => {
             return res.status(401).json({ message: "Falsches Passwort!" });
         }
 
-        res.json({ message: "Login erfolgreich!", username });
+        // JWT-Token generieren
+        const token = jwt.sign({ username }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        res.json({ message: "Login erfolgreich!", token });
     } catch (error) {
         console.error("❌ Loginfehler:", error);
         res.status(500).json({ message: "Serverfehler beim Login" });
     }
 });
+
+// Middleware zur Überprüfung des Tokens
+const verifyToken = (req, res, next) => {
+    const token = req.headers["authorization"];
+    if (!token) return res.status(403).json({ message: "Token erforderlich!" });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(401).json({ message: "Ungültiges Token!" });
+        req.user = decoded;
+        next();
+    });
+};
 
 // WebSocket-Handling
 let usersOnline = {}; // Speichert eingeloggte Benutzer für den Chat
@@ -102,35 +117,23 @@ io.on("connection", (socket) => {
 
     // WebRTC Signalisierung
     socket.on("offer", (data) => {
-        // Weitersenden der offer-Nachricht an den Empfänger
         const targetSocket = usersOnline[data.to];
         if (targetSocket) {
-            io.to(targetSocket).emit("offer", {
-                from: socket.username,
-                offer: data.offer,
-            });
+            io.to(targetSocket).emit("offer", { from: socket.username, offer: data.offer });
         }
     });
 
     socket.on("answer", (data) => {
-        // Weitersenden der answer-Nachricht an den Absender
         const targetSocket = usersOnline[data.to];
         if (targetSocket) {
-            io.to(targetSocket).emit("answer", {
-                from: socket.username,
-                answer: data.answer,
-            });
+            io.to(targetSocket).emit("answer", { from: socket.username, answer: data.answer });
         }
     });
 
     socket.on("candidate", (data) => {
-        // Weitersenden der ICE-Kandidaten an den Empfänger
         const targetSocket = usersOnline[data.to];
         if (targetSocket) {
-            io.to(targetSocket).emit("candidate", {
-                from: socket.username,
-                candidate: data.candidate,
-            });
+            io.to(targetSocket).emit("candidate", { from: socket.username, candidate: data.candidate });
         }
     });
 
@@ -144,21 +147,20 @@ io.on("connection", (socket) => {
 });
 
 // Abrufen eines Benutzers anhand einer Abfrage (Benutzername oder ID)
-app.get("/getUser", (req, res) => {
+app.get("/getUser", verifyToken, (req, res) => {
     const user = getUserByQuery(req.query.query);
     if (!user) return res.status(404).json({ error: "Benutzer nicht gefunden" });
     res.json(user);
 });
 
 // Hinzufügen eines Freundes
-app.post("/addFriend", (req, res) => {
+app.post("/addFriend", verifyToken, (req, res) => {
     const { userID, friendID } = req.body;
 
     if (!userID || !friendID) {
         return res.status(400).json({ message: "Benutzer-ID und Freund-ID sind erforderlich!" });
     }
 
-    // Sicherstellen, dass beide Benutzer existieren
     const users = loadUsers();
     const user = users[userID];
     const friend = users[friendID];
@@ -175,7 +177,6 @@ app.post("/addFriend", (req, res) => {
 app.get("/getIceServers", (req, res) => {
     const https = require("https");
 
-    // Optionen für die Xirsys-API
     const options = {
         host: "global.xirsys.net",
         path: "/_turn/LYNQER",
