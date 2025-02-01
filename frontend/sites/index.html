@@ -3,17 +3,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Willkommen</title>
-    <!-- Link zum Stylesheet -->
+    <title>ChatApp</title>
     <link rel="stylesheet" href="../styles/index-style.css">
+    <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script> <!-- Falls du Pusher nutzt -->
 </head>
 <body>
-    <div class="welcome-container">
-        <h1>Willkommen zurück, <span id="username"></span>!</h1>
-        <button id="logoutBtn">Abmelden</button>
+    <div class="app-container">
+        <!-- Kontakte und Freundesanfragen -->
+        <div class="contacts-list">
+            <header class="contact-header">
+                <h2>Kontakte</h2>
+                <button id="logoutBtn" aria-label="Abmelden">Abmelden</button>
+            </header>
+            
+            <!-- Freundesanfragen -->
+            <div id="friendRequestsContainer">
+                <h3>Freundesanfragen</h3>
+                <div id="requestList"></div> <!-- Hier kommen die Anfragen -->
+            </div>
+
+            <!-- Freundesliste -->
+            <div id="friendsContainer">
+                <h3>Freunde</h3>
+                <div id="contacts"></div> <!-- Freunde werden hier eingefügt -->
+            </div>
+
+            <button id="addContactBtn" class="add-contact-btn" aria-label="Kontakt hinzufügen">+</button>
+        </div>
+
+        <!-- Chat Bereich -->
+        <div class="chat-area">
+            <header class="chat-header">
+                <h3 id="chatUsername">Chat</h3>
+                <button id="callBtn" aria-label="Anruf starten">📞</button>
+            </header>
+            <div id="messageArea" class="message-area"></div>
+            <div class="message-input">
+                <input type="text" id="messageInput" placeholder="Schreibe eine Nachricht..." aria-label="Nachricht eingeben" />
+                <button id="sendBtn" aria-label="Nachricht senden">Senden</button>
+            </div>
+        </div>
+
+        <!-- Profil Popup -->
+        <div id="profilePopup" class="popup">
+            <div class="popup-content">
+                <h2 id="profileUsername">Name: </h2>
+                <p id="profileID">ID: </p>
+                <p id="profileBio">Bio: </p>
+                <button id="addFriendBtn" aria-label="Freund hinzufügen">Hinzufügen</button>
+                <button id="closeProfilePopup" aria-label="Popup schließen">Schließen</button>
+            </div>
+        </div>
+        
+        <!-- Kontakt Hinzufügen Popup -->
+        <div id="addContactPopup" class="popup">
+            <div class="popup-content">
+                <h2>Kontakt hinzufügen</h2>
+                <input type="text" id="usernameInput" placeholder="Benutzername" aria-label="Benutzername eingeben" />
+                <p id="errorMessage" style="color: red; display: none;">Person konnte nicht gefunden werden!</p>
+                <button id="addContactSubmitBtn" aria-label="Kontakt hinzufügen">Hinzufügen</button>
+                <button id="closeAddContactPopup" aria-label="Popup schließen">Schließen</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Link zur JavaScript-Datei -->
+    <script>
+        // Wichtige Variablen
+        let userId = null;  // ID des eingeloggten Benutzers (muss durch Login gesetzt werden)
+        let socket = io(); // Socket.io-Verbindung
+
+        // Kontakt hinzufügen Popup öffnen
+        document.getElementById('addContactBtn').addEventListener('click', () => {
+            document.getElementById('addContactPopup').style.display = 'block';
+        });
+
+        // Kontakt hinzufügen - Schließen
+        document.getElementById('closeAddContactPopup').addEventListener('click', () => {
+            document.getElementById('addContactPopup').style.display = 'none';
+        });
+
+        // Kontakt hinzufügen - Submit
+        document.getElementById('addContactSubmitBtn').addEventListener('click', () => {
+            const username = document.getElementById('usernameInput').value;
+            fetch(`/getUser?query=${username}`)
+                .then(response => response.json())
+                .then(user => {
+                    // Wenn Benutzer gefunden
+                    if (user) {
+                        addFriendRequest(user.id);
+                    } else {
+                        document.getElementById('errorMessage').style.display = 'block';
+                    }
+                })
+                .catch(error => console.error('Fehler beim Abrufen des Benutzers:', error));
+        });
+
+        // Freundesliste abrufen und anzeigen
+        function loadFriends() {
+            fetch('/getFriends')
+                .then(response => response.json())
+                .then(friends => {
+                    const contactsContainer = document.getElementById('contacts');
+                    contactsContainer.innerHTML = ''; // Clear current contacts
+                    friends.forEach(friend => {
+                        const friendDiv = document.createElement('div');
+                        friendDiv.textContent = friend.username;
+                        friendDiv.addEventListener('click', () => {
+                            openProfile(friend);
+                        });
+                        contactsContainer.appendChild(friendDiv);
+                    });
+                });
+        }
+
+        // Freundesanfragen abrufen und anzeigen
+        function loadFriendRequests() {
+            fetch('/getFriendRequests')
+                .then(response => response.json())
+                .then(requests => {
+                    const requestList = document.getElementById('requestList');
+                    requestList.innerHTML = ''; // Clear current requests
+                    requests.forEach(request => {
+                        const requestDiv = document.createElement('div');
+                        requestDiv.textContent = `${request.username} möchte mit dir befreundet sein.`;
+                        const acceptButton = document.createElement('button');
+                        acceptButton.textContent = 'Annehmen';
+                        acceptButton.addEventListener('click', () => {
+                            acceptFriendRequest(request.id);
+                        });
+                        requestDiv.appendChild(acceptButton);
+                        requestList.appendChild(requestDiv);
+                    });
+                });
+        }
+
+        // Freundesanfrage annehmen
+        function acceptFriendRequest(friendId) {
+            fetch('/acceptFriendRequest', {
+                method: 'POST',
+                body: JSON.stringify({ friendId }),
+                headers: { 'Content-Type': 'application/json' },
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        loadFriends();  // Freunde neu laden
+                        loadFriendRequests();  // Freundesanfragen neu laden
+                    }
+                });
+        }
+
+        // Freund hinzufügen
+        function addFriendRequest(friendId) {
+            fetch('/addFriend', {
+                method: 'POST',
+                body: JSON.stringify({ userId, friendId }),
+                headers: { 'Content-Type': 'application/json' },
+            })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('Freundesanfrage gesendet');
+                        document.getElementById('addContactPopup').style.display = 'none';
+                    }
+                });
+        }
+
+        // Profil anzeigen
+        function openProfile(friend) {
+            document.getElementById('profileUsername').textContent = `Name: ${friend.username}`;
+            document.getElementById('profileID').textContent = `ID: ${friend.id}`;
+            document.getElementById('profileBio').textContent = `Bio: ${friend.bio}`;
+            document.getElementById('profilePopup').style.display = 'block';
+        }
+
+        // Profil schließen
+        document.getElementById('closeProfilePopup').addEventListener('click', () => {
+            document.getElementById('profilePopup').style.display = 'none';
+        });
+
+        // Abmelden
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            fetch('/logout')
+                .then(() => {
+                    window.location.href = '/login';
+                });
+        });
+
+        // Initialisieren der Seite
+        document.addEventListener('DOMContentLoaded', () => {
+            // Hier muss die ID des eingeloggten Benutzers gesetzt werden
+            userId = 'yourLoggedInUserId'; // Dies wird im Backend gesetzt
+
+            loadFriends(); // Freunde laden
+            loadFriendRequests(); // Freundesanfragen laden
+        });
+    </script>
     <script src="../scripts/index.js"></script>
 </body>
 </html>

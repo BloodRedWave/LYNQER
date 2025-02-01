@@ -4,17 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrieren</title>
-    <link rel="stylesheet" href="styles/register-style.css">
+    <link rel="stylesheet" href="../styles/register-style.css">
 </head>
 <body>
     <div class="register-container">
         <h2>Registrieren</h2>
-        <input type="text" id="newUsername" placeholder="Benutzername">
-        <input type="password" id="newPassword" placeholder="Passwort">
+        <input type="text" id="fullName" placeholder="Name" required>
+        <input type="text" id="newUsername" placeholder="Benutzername" required>
+        <input type="password" id="newPassword" placeholder="Passwort" required>
+        <input type="password" id="confirmPassword" placeholder="Passwort wiederholen" required>
         <button id="registerBtn">Registrieren</button>
-        <p>Bereits ein Konto? <a href="login.html">Jetzt anmelden</a></p>
+        <p>Bereits ein Konto? <a href="/sites/login.html">Jetzt anmelden</a></p>
     </div>
 
-    <script src="scripts/register.js"></script>
+    <script src="../scripts/register.js"></script>
 </body>
 </html>

@@ -4,17 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login</title>
-    <link rel="stylesheet" href="styles/login-style.css">
+    <link rel="stylesheet" href="../styles/login-style.css">
 </head>
 <body>
     <div class="login-container">
         <h2>Login</h2>
-        <input type="text" id="username" placeholder="Benutzername">
-        <input type="password" id="password" placeholder="Passwort">
+        <input type="text" id="username" placeholder="Benutzername" required>
+        <input type="password" id="password" placeholder="Passwort" required>
         <button id="loginBtn">Anmelden</button>
-        <p>Kein Konto? <a href="register.html">Jetzt registrieren</a></p>
+        <p>Kein Konto? <a href="/sites/register.html">Jetzt registrieren</a></p>
+
     </div>
 
-    <script src="scripts/login.js"></script>
+    <script src="../scripts/login.js"></script>
 </body>
 </html>

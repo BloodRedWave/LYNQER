@@ -22,6 +22,7 @@ h2 {
     font-size: 1.8rem;
     margin-bottom: 30px;
     color: #fff;
+    text-align: center;  /* Text jetzt zentriert */
 }
 
 input {
@@ -32,6 +33,7 @@ input {
     color: #f0f0f0;
     border: 1px solid #444;
     border-radius: 8px;
+    box-sizing: border-box; /* Ensures padding doesn't add extra width */
 }
 
 button {
@@ -56,4 +58,9 @@ a {
 
 a:hover {
     text-decoration: underline;
+}
+
+p {
+    text-align: center;  /* Zentriert den Text */
+    margin-top: 10px;    /* Fügt Abstand oben hinzu */
 }
